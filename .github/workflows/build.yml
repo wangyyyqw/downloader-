@@ -5,6 +5,9 @@ on:
     tags: [ 'v*.*.*' ]  # Only run on version tags like v1.0.0
   workflow_dispatch:
 
+permissions:
+  contents: write  # Grant write permission for releasing
+
 jobs:
   build:
     strategy:
@@ -45,26 +48,33 @@ jobs:
     - name: Build Mac app
       if: matrix.os == 'macos-latest'
       run: |
-        # Build and get the binary from the app bundle
+        # Create build output directory
+        mkdir -p build/bin
+        
+        # Build arm64 version
         wails build -platform darwin/arm64
-        # Extract the binary from the app bundle
+        # Extract arm64 binary
         cp build/bin/weread_downloader.app/Contents/MacOS/weread_downloader build/bin/weread_downloader-darwin-arm64
+        # Save arm64 app bundle
+        cp -r build/bin/weread_downloader.app build/bin/weread_downloader-arm64.app
         
         # Build amd64 version
         wails build -platform darwin/amd64
-        # Extract the binary from the app bundle
+        # Extract amd64 binary
         cp build/bin/weread_downloader.app/Contents/MacOS/weread_downloader build/bin/weread_downloader-darwin-amd64
         
         echo "Creating universal binary..."
         mkdir -p build/universal
+        # Create universal binary
         lipo -create build/bin/weread_downloader-darwin-arm64 build/bin/weread_downloader-darwin-amd64 -output build/universal/weread_downloader
-        cp -r build/darwin/Info.plist build/universal/
+        # Copy supporting files
+        if [ -f build/darwin/Info.plist ]; then
+          cp build/darwin/Info.plist build/universal/
+        fi
         if [ -f build/darwin/iconfile.icns ]; then
-          cp -r build/darwin/iconfile.icns build/universal/
+          cp build/darwin/iconfile.icns build/universal/
         fi
         echo "Universal binary created"
-        # Keep the arm64 app bundle
-        mv build/bin/weread_downloader.app build/bin/weread_downloader-arm64.app
 
     - name: Build Windows app
       if: matrix.os == 'windows-latest'
@@ -95,6 +105,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Set up directory
+      run: mkdir -p build/bin
+
     - name: Download Mac artifacts
       uses: actions/download-artifact@v4
       with:
@@ -107,15 +120,14 @@ jobs:
         name: weread-downloader-windows
         path: build/bin
 
+    - name: List build files
+      run: ls -la build/bin
+
     - name: Create release
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          build/bin/weread_downloader-arm64.app
-          build/bin/weread_downloader-darwin-arm64
-          build/bin/weread_downloader-darwin-amd64
-          build/bin/weread_downloader.exe
-          build/bin/universal/*
+          build/bin/*
         draft: false
         prerelease: false
       env:

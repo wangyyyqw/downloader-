@@ -408,7 +408,7 @@ func GenerateEPUB(bookName, bookPath string) {
 	fmt.Printf("EPUB文件生成成功: %s\n", epubPath)
 }
 
-func GetBookInfo(bookId, skey, vid string) (int64, int64, string, string) {
+func GetBookInfo(bookId, skey, vid string) (int64, int64, string, string, string, string) {
 
 	url := "https://i.weread.qq.com/book/info?bookId=" + bookId + "&myzy=1&source=reading&teenmode=0"
 	client := http.Client{}
@@ -584,11 +584,11 @@ func GetBookInfo(bookId, skey, vid string) (int64, int64, string, string) {
 	bookVersion := res.Version
 	bookFormat := res.Format
 	fmt.Println(bookChapterSize, bookVersion, bookFormat)
-	return bookChapterSize, bookVersion, bookFormat, res.Title
+	return bookChapterSize, bookVersion, bookFormat, res.Title, res.Author, res.Publisher
 }
 func DownloadBook(bookId, skey, vid string) string {
 	fmt.Println("开始下载", bookId)
-	bookChapterSize, bookVersion, bookFormat, bookName := GetBookInfo(bookId, skey, vid)
+	bookChapterSize, bookVersion, bookFormat, bookName, bookAuthor, bookPublisher := GetBookInfo(bookId, skey, vid)
 
 	// 获取用户文档目录下的下载路径
 	downloadsPath, err := getDownloadPath()
@@ -639,7 +639,16 @@ func DownloadBook(bookId, skey, vid string) string {
 		return "创建书籍目录失败"
 	}
 
-	zipPath := filepath.Join(bookDir, bookName+".zip")
+	// 构建包含作者和出版社的完整书籍名称
+	fullBookName := bookName
+	if bookAuthor != "" {
+		fullBookName += " - " + bookAuthor
+	}
+	if bookPublisher != "" {
+		fullBookName += " - " + bookPublisher
+	}
+
+	zipPath := filepath.Join(bookDir, fullBookName+".zip")
 	f, err := os.Create(zipPath)
 	if err != nil {
 		fmt.Println(err, "create f")
@@ -667,7 +676,7 @@ func DownloadBook(bookId, skey, vid string) string {
 			fmt.Println(err, "open file")
 			return "打开文件失败"
 		}
-		fileName := filepath.Join(bookDir, bookName, f.Name)
+		fileName := filepath.Join(bookDir, fullBookName, f.Name)
 		_, err = os.Stat(fileName)
 		if err == nil {
 			continue
@@ -702,7 +711,7 @@ func DownloadBook(bookId, skey, vid string) string {
 		fmt.Println("删除ZIP文件失败:", err)
 	}
 	// 导出书籍
-	bookPath := filepath.Join(bookDir, bookName+"/")
+	bookPath := filepath.Join(bookDir, fullBookName+"/")
 	if bookFormat == "epub" {
 		MergePdfBook(bookName, bookPath)
 	} else {

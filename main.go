@@ -17,9 +17,12 @@ func main() {
 	// Create application with options
 	err := wails.Run(&options.App{
 		Title:  "下载器",
-		Width:  1340,
-		Height: 850,
-		DisableResize: true,
+		Width:  1150,
+		Height: 650,
+		MinWidth: 800,
+		MinHeight: 600,
+		DisableResize: false,
+		WindowStartState: options.Normal,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

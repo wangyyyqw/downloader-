@@ -14,12 +14,7 @@
           </n-button>
         </div>
 
-        <div class="flex items-center text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-           <n-icon class="mr-1 text-gray-400" size="14">
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M256 56C145.72 56 56 145.72 56 256s89.72 200 200 200 200-89.72 200-200S366.28 56 256 56zm0 82a26 26 0 1 1-26 26 26 26 0 0 1 26-26zm48 226h-88a16 16 0 0 1 0-32h28v-88h-16a16 16 0 0 1 0-32h32a16 16 0 0 1 16 16v104h28a16 16 0 0 1 0 32z" fill="currentColor"/></svg>
-           </n-icon>
-           文件夹中的书籍只能获取前四本，程序默认从第九本开始下载，一次最多下载 47 本
-         </div>
+
 
         <div class="flex items-center gap-4">
            <!-- 状态提示 -->
@@ -28,6 +23,22 @@
           </div>
           <div v-else-if="isBookShelfLoading" class="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
             正在加载书架...
+          </div>
+
+          <!-- 批量选择控制区 -->
+          <div class="flex gap-2" v-if="!isDownloadingAll">
+            <template v-if="!isSelectionMode">
+               <n-button secondary type="info" @click="toggleSelectionMode">
+                 <template #icon><n-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M400 48H112a64.07 64.07 0 00-64 64v288a64.07 64.07 0 0064 64h288a64.07 64.07 0 0064-64V112a64.07 64.07 0 00-64-64zm-48 288H160a16 16 0 010-32h192a16 16 0 010 32zm32-96H128a16 16 0 010-32h256a16 16 0 010 32z" fill="currentColor"/></svg></n-icon></template>
+                 批量选择
+               </n-button>
+            </template>
+            <template v-else>
+               <n-button secondary @click="toggleSelectionMode">取消</n-button>
+               <n-button type="info" @click="downloadSelectedBooks" :disabled="selectedBooks.size === 0">
+                 下载选中 ({{ selectedBooks.size }})
+               </n-button>
+            </template>
           </div>
 
           <n-button
@@ -69,21 +80,24 @@
       </div>
     </div>
 
-    <div class="flex-grow px-6 py-6 max-w-7xl mx-auto w-full">
-        <n-grid x-gap="16" y-gap="16" :cols="5">
+    <div class="flex-grow py-6 max-w-7xl mx-auto" style="width: 94%;">
+        <n-grid x-gap="16" y-gap="16" cols="2 s:3 m:4 l:5 xl:6" responsive="screen">
           <n-gi v-for="book in bookList" :key="book.bookId">
             <n-card
               hoverable
-              class="h-full transition-transform duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer"
+              class="h-full transition-transform duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer relative"
+              :class="{ 'ring-2 ring-blue-500': selectedBooks.has(book.bookId) }"
               content-style="padding: 6px;"
-              @click="
-                downloadBook(
-                  book.bookId,
-                  book.title,
-                  book.format == 'txt' ? true : false
-                )
-              "
+              @click="handleBookClick(book)"
             >
+              <!-- Checkbox overlay -->
+              <div v-if="isSelectionMode" class="absolute top-2 right-2 z-10 bg-white rounded-full p-1 shadow-md transition-all"
+                   :class="selectedBooks.has(book.bookId) ? 'text-blue-500' : 'text-gray-300'">
+                 <n-icon size="20">
+                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M416 128L192 384l-96-96"/></svg>
+                 </n-icon>
+              </div>
+
               <div class="flex flex-col h-full">
                 <div class="relative w-full aspect-[2/3] mb-3 overflow-hidden rounded bg-gray-100">
                    <img class="w-full h-full object-cover transition-transform duration-500 hover:scale-110" :src="book.cover" loading="lazy" />
@@ -123,11 +137,19 @@
           positive-text="我知道了，后果自负"
           @positive-click="showRiskModal = false"
         >
-          <div class="text-lg font-bold text-red-600">
+          <div class="text-lg font-bold text-red-600 mb-6">
             <p class="mb-4">郑重警告：</p>
             <p class="mb-4">使用本软件进行下载操作有极大导致 WR 账号被封禁的风险！</p>
             <p class="mb-4">一旦封号，将无法解封，请务必谨慎使用！</p>
             <p>建议仅使用小号进行测试。</p>
+          </div>
+          <div class="bg-blue-50 p-4 rounded-lg text-sm text-blue-800 border border-blue-200">
+             <p class="font-bold mb-2">💡 使用提示：</p>
+             <ul class="list-disc list-inside space-y-1">
+               <li>文件夹中的书籍只能获取前四本</li>
+               <li>程序默认从第九本开始下载</li>
+               <li>一次最多下载 47 本</li>
+             </ul>
           </div>
         </n-modal>
   </div>
@@ -170,6 +192,59 @@ const isDownloadingAll = ref(false);
 const currentDownloadingBook = ref("");
 const downloadedCount = ref(0);
 const totalBooks = ref(0);
+
+// 多选相关状态
+const isSelectionMode = ref(false);
+const selectedBooks = ref(new Set());
+
+const toggleSelectionMode = () => {
+  isSelectionMode.value = !isSelectionMode.value;
+  selectedBooks.value.clear();
+};
+
+const handleBookClick = (book) => {
+  if (isSelectionMode.value) {
+    if (selectedBooks.value.has(book.bookId)) {
+      selectedBooks.value.delete(book.bookId);
+    } else {
+      selectedBooks.value.add(book.bookId);
+    }
+  } else {
+    downloadBook(book.bookId, book.title, book.format == 'txt' ? true : false);
+  }
+};
+
+const downloadSelectedBooks = async () => {
+  if (selectedBooks.value.size === 0) return;
+  
+  isDownloadingAll.value = true;
+  downloadedCount.value = 0;
+  totalBooks.value = selectedBooks.value.size;
+  
+  const booksToDownload = bookList.value.filter(b => selectedBooks.value.has(b.bookId));
+
+  try {
+    let vid = vidRef.value.toString();
+    for (const [index, book] of booksToDownload.entries()) {
+      currentDownloadingBook.value = book.title;
+      await Download(book.bookId, skeyRef.value, vid);
+      downloadedCount.value++;
+      
+      if (index < booksToDownload.length - 1) {
+        const delaySeconds = (Math.floor(Math.random() * (3 - 1 + 1)) + 1);
+        await new Promise(r => setTimeout(r, delaySeconds * 1000));
+      }
+    }
+    message.success(`已完成 ${downloadedCount.value} 本书籍的下载`);
+    toggleSelectionMode();
+  } catch (error) {
+    message.error(`批量下载出错: ${error.message}`);
+  } finally {
+    isDownloadingAll.value = false;
+    currentDownloadingBook.value = "";
+  }
+};
+
 const checkLoginStatus = () => {
   if (!localStorage.getItem("userInfo")) {
     localStorage.clear();

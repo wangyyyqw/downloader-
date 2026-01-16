@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"io"
 	"net/http"
 	"strings"
@@ -25,6 +26,37 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	// Perform your setup here
 	a.ctx = ctx
+
+	// Set window size to 60% of primary screen
+	screens, err := runtime.ScreenGetAll(ctx)
+	if err == nil && len(screens) > 0 {
+		var primaryScreen runtime.Screen
+		foundPrimary := false
+		for _, screen := range screens {
+			if screen.IsPrimary {
+				primaryScreen = screen
+				foundPrimary = true
+				break
+			}
+		}
+		if !foundPrimary {
+			primaryScreen = screens[0]
+		}
+
+		width := int(float64(primaryScreen.Size.Width) * 0.6)
+		height := int(float64(primaryScreen.Size.Height) * 0.6)
+
+		// Respect minimum size constraints
+		if width < 800 {
+			width = 800
+		}
+		if height < 600 {
+			height = 600
+		}
+
+		runtime.WindowSetSize(ctx, width, height)
+		runtime.WindowCenter(ctx)
+	}
 }
 
 // domReady is called after front-end resources have been loaded

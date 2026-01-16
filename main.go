@@ -19,6 +19,8 @@ func main() {
 		Title:  "下载器",
 		Width:  1150,
 		Height: 650,
+		MinWidth: 800,
+		MinHeight: 600,
 		DisableResize: false,
 		WindowStartState: options.Normal,
 		AssetServer: &assetserver.Options{

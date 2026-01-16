@@ -19,7 +19,7 @@
         <div class="flex items-center gap-4">
            <!-- 状态提示 -->
           <div v-if="isDownloadingAll" class="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full animate-pulse">
-            正在下载: {{ currentDownloadingBook }} ({{ downloadedCount }}/{{ totalBooks }})
+            {{ downloadStatus }} ({{ downloadedCount }}/{{ totalBooks }})
           </div>
           <div v-else-if="isBookShelfLoading" class="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
             正在加载书架...
@@ -80,8 +80,8 @@
       </div>
     </div>
 
-    <div class="flex-grow py-6 max-w-7xl mx-auto" style="width: 94%;">
-        <n-grid x-gap="16" y-gap="16" cols="2 s:3 m:4 l:5 xl:6" responsive="screen">
+    <div class="flex-grow py-6 max-w-7xl mx-auto" style="width: 96%;">
+        <n-grid x-gap="20" y-gap="20" cols="3 s:4 m:5 l:6 xl:7" responsive="screen">
           <n-gi v-for="book in bookList" :key="book.bookId">
             <n-card
               hoverable
@@ -103,7 +103,7 @@
                    <img class="w-full h-full object-cover transition-transform duration-500 hover:scale-110" :src="book.cover" loading="lazy" />
                 </div>
                 <div class="flex-grow flex flex-col justify-between">
-                  <div class="text-sm font-bold text-gray-800 line-clamp-2 mb-1" :title="book.title">{{ book.title }}</div>
+                  <div class="text-sm font-bold text-gray-800 truncate mb-1" :title="book.title">{{ book.title }}</div>
                   <div class="text-xs text-gray-500 truncate">{{ book.author }}</div>
                 </div>
               </div>
@@ -190,6 +190,7 @@ const isBookShelfLoading = ref(false);
 // 一键下载相关状态
 const isDownloadingAll = ref(false);
 const currentDownloadingBook = ref("");
+const downloadStatus = ref("");
 const downloadedCount = ref(0);
 const totalBooks = ref(0);
 
@@ -227,11 +228,13 @@ const downloadSelectedBooks = async () => {
     let vid = vidRef.value.toString();
     for (const [index, book] of booksToDownload.entries()) {
       currentDownloadingBook.value = book.title;
+      downloadStatus.value = `正在下载: ${book.title}`;
       await Download(book.bookId, skeyRef.value, vid);
       downloadedCount.value++;
       
       if (index < booksToDownload.length - 1) {
         const delaySeconds = (Math.floor(Math.random() * (3 - 1 + 1)) + 1);
+        downloadStatus.value = `等待 ${delaySeconds} 秒后下载下一本书...`;
         await new Promise(r => setTimeout(r, delaySeconds * 1000));
       }
     }
@@ -336,6 +339,7 @@ const downloadAllBooks = async () => {
 
     for (const [index, book] of booksToDownload.entries()) {
       currentDownloadingBook.value = book.title;
+      downloadStatus.value = `正在下载: ${book.title}`;
       
       // 调用下载函数
       await Download(book.bookId, skeyRef.value, vid);
@@ -345,8 +349,8 @@ const downloadAllBooks = async () => {
       // 如果不是最后一本书，添加随机延迟
       if (index < booksToDownload.length - 1) {
         const delaySeconds = (Math.floor(Math.random() * (5 - 2 + 1)) + 2);
-        message.info(`等待 ${delaySeconds} 秒后下载下一本书...`);
-        await randomDelay();
+        downloadStatus.value = `等待 ${delaySeconds} 秒后下载下一本书...`;
+        await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
       }
     }
 
